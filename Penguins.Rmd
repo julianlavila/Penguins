@@ -55,9 +55,6 @@ df_penguinloc <- penguins %>%
   group_by(island) %>%  summarise(amount=n()) %>% 
   left_join(df_penguinloc, by = "island")
 
-# "#B1BFCD", "#869BB1", "#68829E" greys
-
-
 # barplot
 
 d <- penguins %>% filter(year==2009) %>% 
