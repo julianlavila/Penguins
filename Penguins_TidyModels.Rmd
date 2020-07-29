@@ -1,0 +1,105 @@
+---
+title: "Penguins TidyModels"
+author: "Julián Avila-Jiménez"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(cache=TRUE,warning = FALSE, echo = TRUE, message = FALSE,
+                      dpi= 180, fig.width = 8, fig.height = 5)
+library(tidyverse)
+
+```
+
+## Initial model
+
+Model for [sex of the tree species of penguins](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-07-28/readme.md). Clasification model to distinguish male and female penguins.
+
+## Explore the data
+
+```{r echo=FALSE}
+penguins <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-07-28/penguins.csv')
+
+kable(head(penguins), caption = "Penguins data. Source: Gorman, Williams and Fraser, 2014 ")
+
+# The species inhabit diferent islands 
+penguins %>% count(island, species) %>% kable(caption = "Number of individuals by Species by Island")
+
+# Let's see sexes by species 
+penguins %>% count(species, sex) %>% kable(caption = "Sex by Species")
+
+# and the years of the colectes data
+penguins %>% count(year) %>% kable(caption= "The number of recods by Year")
+
+```
+
+### Basic exploratory analisys
+
+```{r}
+penguins %>% 
+  filter (!is.na(sex)) %>% 
+  ggplot (aes (flipper_length_mm, bill_length_mm, 
+               color= sex, size= body_mass_g))+
+  geom_point (alpha= 0.7)+
+  labs(x="Flipper length (mm)", y="Bill length (mm)")+
+  facet_wrap (~species)
+```
+
+```{r}
+penguins_df <- penguins %>%
+  filter(!is.na(sex)) %>%
+  select(-year, -island)
+```
+
+## Building a model to predict the sex by the other variables
+
+```{r}
+library(tidymodels)
+
+set.seed(123)
+penguin_split <- initial_split(penguins_df, strata = sex)
+penguin_train <- training(penguin_split)
+penguin_test <- testing(penguin_split) #use to test perfonmance for the model
+
+set.seed(123)
+penguin_boot<- bootstraps(penguin_train) #25 different bootstraps of n=250
+penguin_boot
+```
+### Basic logistic regression model
+```{r}
+glm_spec <- logistic_reg() %>%
+  set_engine("glm")
+
+glm_spec
+```
+
+### Random forest model
+```{r}
+rf_spec <- rand_forest() %>%
+  set_mode("classification") %>%
+  set_engine("ranger")
+
+rf_spec
+```
+
+### Preprocessor and model
+
+```{r}
+penguin_wf<-workflow() %>% 
+  add_formula(sex ~ .)
+penguin_wf
+```
+
+```{r}
+glm_rs <- penguin_wf %>%
+  add_model(glm_spec) %>%
+  fit_resamples(
+    resamples = penguin_boot,
+    control = control_resamples(save_pred = TRUE, verbose = T)
+  )
+
+glm_rs
+```
+
